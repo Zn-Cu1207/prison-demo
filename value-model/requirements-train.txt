@@ -1,0 +1,20 @@
+# 价值模型 训练 / 标注 / 推理服务 —— 统一用这一个 venv
+# GPU：RTX 3060 12G，1.5B 用 fp16 + LoRA 即可，不需要 bitsandbytes（Windows 上装它很痛）。
+#
+# 安装（在 value-model/ 下）：
+#   py -3.11 -m venv .venv
+#   .\.venv\Scripts\python -m pip install -U pip
+#   .\.venv\Scripts\pip install -r requirements-train.txt
+#
+# torch 走 CUDA 12.1 官方轮子：
+--extra-index-url https://download.pytorch.org/whl/cu121
+torch==2.3.1
+transformers==4.44.2
+peft==0.12.0
+accelerate==0.33.0
+datasets==2.20.0
+safetensors>=0.4.3
+sentencepiece>=0.2.0
+huggingface_hub>=0.24.0
+# 标注客户端调 hy3(混元) OpenAI 兼容端点
+httpx>=0.27.0

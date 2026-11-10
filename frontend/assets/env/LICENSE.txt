@@ -1,0 +1,49 @@
+Jampot — Prison Pack
+ASSET LICENSE AGREEMENT (Royalty-Free Commercial)
+========================================================================
+
+By downloading or using this asset pack ("the Assets"), you agree to the
+terms below.
+
+1. GRANT OF LICENSE
+   You are granted a perpetual, worldwide, non-exclusive, royalty-free
+   license to use, copy, modify, and incorporate the Assets into your own
+   projects, including:
+     - personal, educational, and commercial projects;
+     - video games, apps, films, videos, renders, and printed media;
+     - an unlimited number of titles, with no per-project or per-seat fee.
+
+   No attribution is required (though it is always appreciated).
+
+2. PERMITTED
+   - Use the Assets in commercial products you sell or distribute.
+   - Modify, retexture, remesh, decimate, or otherwise adapt the Assets.
+   - Use the Assets in team/studio projects (the license covers the
+     project; share the raw files only within the team working on it).
+
+3. NOT PERMITTED
+   - Reselling, sublicensing, or redistributing the Assets on their own
+     or as part of another asset pack, template, or model library — i.e.
+     you may not distribute the Assets in a form where their primary
+     value is the 3D models themselves.
+   - Using the Assets in a way that lets end users extract them for use
+     as standalone assets (e.g. an open "asset store" of these models).
+   - Claiming authorship of the original Assets.
+
+4. NFT / BLOCKCHAIN
+   - You may not mint, tokenize, or sell the Assets (or derivatives whose
+     primary content is the Assets) as NFTs or on a blockchain marketplace.
+
+5. NO WARRANTY
+   The Assets are provided "AS IS", without warranty of any kind, express
+   or implied. The author is not liable for any claim or damages arising
+   from the use of the Assets.
+
+6. OWNERSHIP
+   The author retains ownership and copyright of the original Assets.
+   This license grants usage rights, not ownership.
+
+------------------------------------------------------------------------
+In short: build anything you want with them, ship it commercially, keep
+100% of your revenue — just don't resell the assets as an asset pack.
+========================================================================

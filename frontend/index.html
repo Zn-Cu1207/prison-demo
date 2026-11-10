@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>囚笼悖论 · 典狱长夜班</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, "Microsoft YaHei", sans-serif; }
+      #app { position: fixed; inset: 0; }
+      #panel {
+        position: fixed; top: 12px; right: 12px; width: 320px;
+        background: rgba(18, 20, 28, 0.86); color: #e6e8ee; border: 1px solid #2a2f3d;
+        border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5;
+        backdrop-filter: blur(6px);
+      }
+      #panel h2 { margin: 0 0 6px; font-size: 14px; }
+      #panel .sub { color: #8b93a7; font-size: 11px; margin-bottom: 8px; word-break: break-all; }
+      .row { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+      .cand { padding: 5px 8px; border-radius: 6px; background: #1c2130; margin: 3px 0; }
+      .cand.chosen { background: #1e3a2b; border: 1px solid #2f8f5b; }
+      .cand .g { font-weight: 600; }
+      .cand .src { color: #8b93a7; font-size: 11px; }
+      .cand .sc { float: right; font-variant-numeric: tabular-nums; }
+      .bar { height: 6px; background: #2a2f3d; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+      .bar > i { display: block; height: 100%; background: #4f8cff; }
+      /* 打分公式的乘数拆解：只显示偏离 1.0 的项，绿=加成 红=惩罚 */
+      .cand .terms { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 3px; }
+      .cand .terms b { font-weight: 500; font-size: 10px; padding: 1px 4px; border-radius: 3px;
+        background: #2a2f3d; color: #9aa4bb; font-variant-numeric: tabular-nums; }
+      .cand .terms b.up { background: #16351f; color: #7ee787; }
+      .cand .terms b.dn { background: #3a1d1d; color: #ff9c93; }
+      .cand .terms b.stale { background: #3a3419; color: #e3c15a; }
+      /* 重新开局：挪到画面左上角固定角标，录像/反复试玩时一眼可点（原来藏在右侧面板里不好按） */
+      #newgamebtn {
+        position: fixed; top: 12px; left: 12px; z-index: 60; cursor: pointer; user-select: none;
+        background: #3a2410; border: 1px solid #b5762a; border-radius: 8px; padding: 5px 11px;
+        font-size: 12px; font-weight: 700; color: #ffd9a0;
+      }
+      #newgamebtn:hover { background: #4d3015; border-color: #e0952f; }
+      #status { position: fixed; left: 12px; top: 46px; font-size: 12px; color: #8b93a7;
+        background: rgba(18,20,28,.7); padding: 4px 8px; border-radius: 6px; }
+      #npclist { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+      .chip { padding: 3px 8px; border-radius: 12px; background: #1c2130; font-size: 11px;
+        cursor: pointer; border: 1px solid transparent; }
+      .chip.sel { border-color: #4f8cff; background: #16233d; }
+      #explain { background: #16233d; border-left: 3px solid #4f8cff; padding: 6px 8px;
+        border-radius: 4px; font-size: 12px; margin-bottom: 8px; min-height: 16px; }
+      .needs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 10px; margin-bottom: 8px; }
+      .need-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+      .need-row .nm { width: 30px; color: #b7bdcc; }
+      .need-row .nb { flex: 1; height: 7px; background: #2a2f3d; border-radius: 4px; overflow: hidden; }
+      .need-row .nb > i { display: block; height: 100%; }
+      .need-row .nv { width: 22px; text-align: right; color: #8b93a7; font-variant-numeric: tabular-nums; }
+      .sit { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+      .sittag { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: #22283a; color: #c7cede; }
+      .sittag.warn { background: #3a1e26; color: #ff9db0; }
+      .sittag.info { background: #1e2f3a; color: #9dd0ff; }
+      details { margin-top: 6px; }
+      summary { cursor: pointer; color: #8b93a7; font-size: 11px; }
+
+      /* M4 控制台 */
+      #controls { margin-top: 8px; border-top: 1px solid #2a2f3d; padding-top: 8px; }
+      #controls .clabel { color: #8b93a7; font-size: 11px; margin: 4px 0 3px; }
+      .btns { display: flex; flex-wrap: wrap; gap: 4px; }
+      .btn { padding: 3px 9px; border-radius: 6px; font-size: 11px; cursor: pointer;
+        background: #1c2130; border: 1px solid #333a4d; color: #d6dcea; user-select: none; }
+      .btn:hover { background: #26304a; border-color: #4f8cff; }
+      .btn.cmd { background: #16233d; border-color: #2f5a9f; }
+      .btn.evt { background: #2c1a22; border-color: #6f3040; color: #ffb0bd; }
+      .btn.clear { background: #1a2620; border-color: #2f6f4a; color: #a7e0c0; }
+
+      /* 事件横幅（挑事时全屏顶部提示） */
+      #banner {
+        position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+        padding: 8px 22px; border-radius: 10px; font-size: 15px; font-weight: 700;
+        letter-spacing: 2px; color: #fff; display: none; z-index: 40;
+        background: linear-gradient(90deg, rgba(180,40,60,.92), rgba(220,80,60,.92));
+        box-shadow: 0 6px 24px rgba(200,40,60,.5); animation: bpulse 1s ease-in-out infinite;
+      }
+      @keyframes bpulse { 0%,100% { box-shadow: 0 0 18px rgba(220,60,60,.4); } 50% { box-shadow: 0 0 34px rgba(255,90,90,.75); } }
+
+      .btn.scen { background: #241a30; border-color: #5a3f8f; color: #d9c6ff; }
+      /* 重新开局：录像/反复试玩的入口，做得比片段按钮显眼一点，但不至于误触 */
+      .btn.newgame { background: #3a2410; border-color: #b5762a; color: #ffd9a0; font-weight: 600; }
+      .btn.newgame:hover { background: #4d3015; border-color: #e0952f; }
+      .btn.exp { background: #16233d; border-color: #2f5a9f; color: #bcd4ff; }
+
+      /* 招牌片段说明 toast（中央顶部偏下） */
+      #toast {
+        position: fixed; top: 64px; left: 50%; transform: translateX(-50%) translateY(-8px);
+        max-width: 620px; padding: 10px 20px; border-radius: 10px; font-size: 14px;
+        color: #f0ecff; background: rgba(46,30,74,.94); border: 1px solid #6a4fb0;
+        box-shadow: 0 8px 28px rgba(0,0,0,.5); z-index: 45; opacity: 0; pointer-events: none;
+        transition: opacity .3s, transform .3s; text-align: center;
+      }
+      #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+      /* 世界内浮层标签 */
+      .npc-bubble {
+        position: fixed; transform: translate(-50%, -100%); pointer-events: none;
+        padding: 5px 10px 6px; border-radius: 12px; font-size: 12px; line-height: 1.35;
+        max-width: 240px; white-space: normal; text-align: center; color: #f2f4fa;
+        background: linear-gradient(180deg, rgba(28,34,52,.95), rgba(16,20,32,.95));
+        border: 1px solid rgba(120,140,190,.35);
+        box-shadow: 0 6px 18px rgba(0,0,0,.5); backdrop-filter: blur(3px);
+        transition: border-color .15s;
+      }
+      .npc-bubble .nb-head { display: flex; align-items: center; justify-content: center; gap: 5px; margin-bottom: 2px; }
+      .npc-bubble .who { font-weight: 700; }
+      .npc-bubble .act { font-size: 11px; padding: 1px 6px; border-radius: 8px; background: rgba(110,168,255,.2); color: #cfe0ff; }
+      .npc-bubble .state { font-size: 10px; color: #8b93a7; }
+      .npc-bubble .state.doing { color: #8fe0a8; }
+      .npc-bubble .nb-say { font-size: 12px; color: #e9ecf4; opacity: .96; }
+      .npc-bubble .cmd { color: #ffd23f; }
+      .npc-bubble .watch { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: rgba(255,68,68,.28); color: #ffd0d0; }
+      .npc-bubble .plan { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: rgba(120,200,140,.22); color: #cde6d2; }
+      /* 物资/冲突/刑期：这些事以前在世界里不会发生，现在要一眼看见 */
+      .npc-bubble .brawl { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: rgba(255,90,60,.34); color: #ffd7cc; }
+      .npc-bubble .hurt { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: rgba(200,40,40,.30); color: #ffc9c9; }
+      .npc-bubble .hold { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: rgba(220,180,90,.22); color: #f0e0b8; }
+      .npc-bubble .paro { font-size: 10px; padding: 1px 5px; border-radius: 8px; background: rgba(150,120,220,.24); color: #ded0ff; }
+      .npc-bubble .paro.ok { background: rgba(110,200,180,.24); color: #c8f0e6; }
+      .npc-bubble.sel { border-color: #6ea8ff; box-shadow: 0 0 0 1px #6ea8ff, 0 6px 18px rgba(0,0,0,.55); }
+      .npc-bubble.cmded { border-color: #ffd23f; }
+      .npc-bubble.watched { border-color: #ff4444; box-shadow: 0 0 0 1px #ff4444, 0 6px 18px rgba(0,0,0,.55); }
+      .npc-bubble::after {
+        content: ""; position: absolute; left: 50%; bottom: -5px; transform: translateX(-50%);
+        border: 5px solid transparent; border-top-color: rgba(16,20,32,.95);
+      }
+      .facility-tag {
+        position: fixed; transform: translate(-50%, -50%); pointer-events: none;
+        padding: 2px 9px; border-radius: 6px; font-size: 11px; letter-spacing: .5px;
+        color: #dfe6f5; background: rgba(14,18,28,.72); border: 1px solid rgba(120,140,190,.25);
+        text-transform: none; white-space: nowrap;
+      }
+
+      /* 加载遮罩 */
+      #loader {
+        position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+        flex-direction: column; gap: 14px; background: radial-gradient(circle at 50% 40%, #141a28, #080a10);
+        color: #aab3c8; font-size: 14px; z-index: 50; transition: opacity .6s; letter-spacing: 1px;
+      }
+      #loader .spin {
+        width: 34px; height: 34px; border-radius: 50%; border: 3px solid #2a3346;
+        border-top-color: #6ea8ff; animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* 画面暗角，让 3D 更有质感 */
+      #app::after {
+        content: ""; position: fixed; inset: 0; pointer-events: none;
+        box-shadow: inset 0 0 260px rgba(0,0,0,.55);
+      }
+
+      /* 遥测面板（左下）：El Farol 曲线 + 性格选择分布 */
+      #telemetry {
+        position: fixed; left: 12px; bottom: 12px; width: 300px;
+        background: rgba(18, 20, 28, 0.86); color: #e6e8ee; border: 1px solid #2a2f3d;
+        border-radius: 10px; padding: 10px 12px; font-size: 12px; backdrop-filter: blur(6px);
+      }
+      #telemetry .thead { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+      #telemetry .tsub { color: #8b93a7; font-size: 10px; margin-bottom: 6px; }
+      #elfarol { display: block; width: 100%; height: 96px; border-radius: 6px; background: #0e1017; }
+      #dist { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+      .drow { display: flex; align-items: center; gap: 6px; }
+      .drow .dnm { width: 46px; color: #b7bdcc; font-size: 11px; white-space: nowrap; }
+      .drow .dbar { flex: 1; height: 12px; border-radius: 3px; overflow: hidden; display: flex; background: #0e1017; }
+      .drow .dbar > span { height: 100%; }
+      .dlegend { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 10px; color: #8b93a7; }
+      .dlegend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 3px; vertical-align: -1px; }
+
+      /* 玩家操作提示 */
+      #playhint {
+        position: fixed; left: 50%; transform: translateX(-50%); bottom: 12px;
+        font-size: 12px; color: #c7cede; white-space: nowrap;
+        background: rgba(18,20,28,.75); padding: 6px 10px; border-radius: 8px; line-height: 1.6;
+        border: 1px solid #2a2f3d; pointer-events: none; z-index: 30;
+      }
+      /* 视角切换条 */
+      #cambar {
+        position: fixed; left: 50%; transform: translateX(-50%); bottom: 46px;
+        display: flex; align-items: center; gap: 4px; z-index: 31;
+        background: rgba(18,20,28,.8); border: 1px solid #2a2f3d;
+        border-radius: 10px; padding: 5px 7px; backdrop-filter: blur(6px);
+      }
+      #cambar .cbtn {
+        display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+        padding: 4px 10px; border-radius: 7px; font-size: 12px; color: #c7cede;
+        background: #1c2130; border: 1px solid transparent; user-select: none;
+      }
+      #cambar .cbtn:hover { background: #232a3c; }
+      #cambar .cbtn.on { background: #16233d; border-color: #4f8cff; color: #eaf1ff; }
+      #cambar .cbtn b {
+        font-size: 10px; color: #8b93a7; background: #0e1017;
+        border-radius: 3px; padding: 1px 4px; font-weight: 700;
+      }
+      #cambar .cbtn.on b { color: #ffd23f; }
+      #cambar .chint { font-size: 11px; color: #8b93a7; padding-left: 6px; border-left: 1px solid #2a2f3d; }
+      #playhint b { color: #ffd23f; }
+      /* 可互动物提示（3D 浮层） */
+      #acthint {
+        position: fixed; transform: translate(-50%,-100%); pointer-events: none; display: none;
+        padding: 3px 10px; border-radius: 10px; font-size: 12px; color: #eaf1ff;
+        background: rgba(22,35,61,.92); border: 1px solid #4f8cff;
+        box-shadow: 0 4px 12px rgba(0,0,0,.45); white-space: nowrap; z-index: 29;
+      }
+      #acthint b { color: #ffd23f; }
+      /* 随身物品条 */
+      #bag {
+        position: fixed; left: 50%; transform: translateX(-50%); top: 12px;
+        display: none; align-items: center; gap: 6px; z-index: 31;
+        background: rgba(18,20,28,.82); border: 1px solid #2a2f3d;
+        border-radius: 10px; padding: 5px 9px; backdrop-filter: blur(6px);
+      }
+      #bag .btitle { font-size: 11px; color: #8b93a7; padding-right: 4px; border-right: 1px solid #2a2f3d; }
+      #bag .bitem {
+        display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+        padding: 3px 8px; border-radius: 7px; background: #1c2130; font-size: 13px;
+      }
+      #bag .bitem:hover { background: #232a3c; }
+      #bag .bitem em { font-style: normal; font-size: 11px; color: #c7cede; }
+      #bag .bitem i { font-style: normal; font-size: 10px; color: #ffd23f; }
+      /* 能吃/能用的东西：点一下会真的改玩家身体，给个可点的暗示 */
+      #bag .bitem.usable { border: 1px solid #4a7a55; background: #1b2a20; }
+      #bag .bitem.usable:hover { background: #24402c; }
+
+      /* 玩家身体：饿/渴/伤（玩家和 NPC 受同一套物理层约束） */
+      #body {
+        position: fixed; left: 12px; bottom: 12px; z-index: 31;
+        display: none; align-items: center; gap: 8px;
+        background: rgba(18,20,28,.82); border: 1px solid #2a2f3d;
+        border-radius: 10px; padding: 6px 10px; backdrop-filter: blur(6px);
+      }
+      #body .btitle { font-size: 11px; color: #8b93a7; padding-right: 4px; border-right: 1px solid #2a2f3d; }
+      #body .bstat {
+        position: relative; display: inline-block; font-size: 11px; color: #c7cede;
+        width: 62px; padding-bottom: 7px;
+      }
+      #body .bstat i {
+        position: absolute; left: 0; bottom: 0; height: 4px; border-radius: 2px;
+        display: block; transition: width .3s ease;
+      }
+      #body .bstat[data-warn="1"] { color: #ff9b9b; font-weight: 700; }
+
+      /* 挨打时的红闪 */
+      #hurtflash {
+        position: fixed; inset: 0; z-index: 45; pointer-events: none; opacity: 0;
+        background: radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(190,20,20,.85) 100%);
+      }
+      /* 靠近可对话提示（3D 浮层） */
+      #talkhint {
+        position: fixed; transform: translate(-50%,-100%); pointer-events: none; display: none;
+        padding: 3px 10px; border-radius: 10px; font-size: 12px; color: #101018; font-weight: 700;
+        background: #ffd23f; box-shadow: 0 4px 12px rgba(0,0,0,.4); white-space: nowrap; z-index: 30;
+      }
+
+      /* 对话框 */
+      #chat {
+        position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%);
+        width: 460px; max-width: 92vw; display: none; flex-direction: column; z-index: 46;
+        background: rgba(16,19,28,.96); border: 1px solid #39435a; border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,.55);
+      }
+      #chat .chead { display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 12px; border-bottom: 1px solid #2a2f3d; font-weight: 700; color: #ffd23f; }
+      #chat .cclose { cursor: pointer; color: #8b93a7; font-weight: 400; }
+      #chatlog { max-height: 240px; overflow-y: auto; padding: 10px 12px; display: flex;
+        flex-direction: column; gap: 6px; font-size: 13px; }
+      #chatlog .cm { padding: 6px 10px; border-radius: 10px; max-width: 80%; line-height: 1.4; }
+      #chatlog .cm.me { align-self: flex-end; background: #26426e; color: #eaf1ff; }
+      #chatlog .cm.npc { align-self: flex-start; background: #232a3a; color: #e6e8ee; }
+      #chatlog .cm.sys { align-self: center; color: #8b93a7; font-size: 11px; background: none; }
+      #chatbar { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid #2a2f3d; }
+      #chatin { flex: 1; background: #0e1017; border: 1px solid #333a4d; border-radius: 8px;
+        color: #e6e8ee; padding: 7px 10px; font-size: 13px; outline: none; }
+      #chatin:focus { border-color: #ffd23f; }
+      #chatsend { background: #ffd23f; color: #101018; border: none; border-radius: 8px;
+        padding: 0 14px; font-weight: 700; cursor: pointer; }
+
+      /* 线索检视弹窗 */
+      #inspect {
+        position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        z-index: 60; background: rgba(6,8,12,.6); backdrop-filter: blur(3px);
+      }
+      #inspect .card {
+        width: 420px; max-width: 92vw; background: linear-gradient(180deg,#1b2030,#12151f);
+        border: 1px solid #4a5474; border-radius: 14px; padding: 20px 22px; text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,.6);
+      }
+      #inspect .ico { font-size: 60px; line-height: 1; margin: 4px 0 10px; }
+      #inspect .nm { font-size: 18px; font-weight: 700; color: #ffe08a; margin-bottom: 10px; }
+      #inspect .desc { font-size: 14px; color: #dfe4ee; line-height: 1.65; text-align: left; }
+      #inspect .ins { margin-top: 12px; padding: 8px 12px; border-radius: 8px; text-align: left;
+        background: #14233a; border-left: 3px solid #6ea8ff; color: #bcd6ff; font-size: 13px; }
+      #inspect .ok { margin-top: 16px; background: #ffd23f; color: #101018; border: none;
+        border-radius: 8px; padding: 8px 20px; font-weight: 700; cursor: pointer; }
+
+      /* 案件板 / 线索日志 */
+      #journal {
+        position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+        width: 520px; max-width: 94vw; max-height: 84vh; overflow-y: auto; display: none; z-index: 55;
+        background: rgba(18,20,28,.97); border: 1px solid #4a5474; border-radius: 12px; padding: 16px 20px;
+        box-shadow: 0 16px 50px rgba(0,0,0,.6);
+      }
+      #journal h2 { margin: 0 0 4px; font-size: 17px; color: #ffe08a; }
+      #journal .intro { font-size: 12.5px; color: #aab3c8; line-height: 1.6; margin-bottom: 10px; }
+      #journal .prog { font-size: 12px; color: #8b93a7; margin-bottom: 10px; }
+      #journal .clue { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid #262c3a; }
+      #journal .clue .ci { font-size: 26px; }
+      #journal .clue .cn { font-weight: 700; color: #e6e8ee; font-size: 13px; }
+      #journal .clue .cd { color: #aab3c8; font-size: 12px; line-height: 1.5; }
+      #journal .clue .cx { color: #9dd0ff; font-size: 12px; margin-top: 2px; }
+      #journal .locked { color: #5a6070; font-style: italic; font-size: 12px; padding: 6px 0; }
+      #journal .concl { margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+        background: #172a1d; border-left: 3px solid #4bbf7b; color: #b6ecc8; font-size: 13px; line-height: 1.6; }
+      #journal .jclose { position: absolute; top: 12px; right: 16px; cursor: pointer; color: #8b93a7; }
+      #jbtn {
+        position: fixed; right: 12px; bottom: 12px; z-index: 30; cursor: pointer; user-select: none;
+        background: rgba(18,20,28,.85); border: 1px solid #4a5474; border-radius: 10px;
+        padding: 8px 12px; font-size: 13px; color: #ffe08a;
+      }
+      #jbtn .dot { color: #ff6b6b; font-weight: 700; }
+
+      /* ===== 观察者模式：决策卡（点 NPC 弹）+ 两脑对比 + 上帝暂停 ===== */
+      #deck {
+        position: fixed; top: 56px; left: 50%; transform: translateX(-50%);
+        width: 500px; max-width: 94vw; max-height: 80vh; overflow-y: auto; display: none; z-index: 56;
+        background: rgba(16,19,28,.97); border: 1px solid #4a5474; border-radius: 12px;
+        padding: 14px 16px; box-shadow: 0 16px 50px rgba(0,0,0,.6); font-size: 13px; color: #e6e8ee;
+      }
+      #deck .dkclose { position: absolute; top: 10px; right: 14px; cursor: pointer; color: #8b93a7; }
+      #deck h3 { margin: 0 0 2px; font-size: 16px; color: #ffe08a; }
+      #deck .dkrole { color: #8b93a7; font-size: 11px; margin-bottom: 8px; }
+      #deck .dkcore { background: #1c2233; border-left: 3px solid #6ea8ff; padding: 6px 9px;
+        border-radius: 6px; margin-bottom: 8px; color: #cfe0ff; }
+      #deck .dkvo { background: #14231a; border-left: 3px solid #4bbf7b; padding: 7px 10px;
+        border-radius: 6px; margin-bottom: 8px; line-height: 1.5; }
+      #deck .dkquest { background: #24202f; border-left: 3px solid #c8a04a; padding: 7px 10px;
+        border-radius: 6px; margin-bottom: 8px; }
+      #deck .dkquest .rkbar { height: 6px; border-radius: 3px; background: #2a2f3d; overflow: hidden; }
+      #deck .dkquest .rkbar > i { display: block; height: 100%; background: linear-gradient(90deg,#e0a840,#ffe08a); }
+      #deck .dklog { margin: 6px 0 8px; }
+      #deck .dklog .lg { padding: 3px 0; border-top: 1px solid #232a3a; color: #c7cede; font-size: 12px; }
+      #deck .dklog .lg b { color: #ffd23f; font-weight: 600; }
+      #deck .cmpbtn { display: block; width: 100%; text-align: center; margin: 6px 0 4px; padding: 8px;
+        border-radius: 8px; cursor: pointer; font-weight: 700; color: #101018; background: #ffd23f; border: none; }
+      #deck .cmpbtn:hover { background: #ffdf6b; }
+      #deck .cmpbtn.busy { background: #5a5330; color: #b7ad7a; cursor: default; }
+      #deck .verdict { border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 12.5px; line-height: 1.55; }
+      #deck .verdict.violated { background: #2b1416; border: 1px solid #7a2a2f; color: #ffb9b0; }
+      #deck .verdict.both_ok { background: #142b1c; border: 1px solid #2f6f4a; color: #a7e6c4; }
+      #deck .verdict.na { background: #1a2333; border: 1px solid #33415f; color: #bcd0f0; }
+      #deck .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      #deck .brainbox { background: #12151f; border: 1px solid #2a2f3d; border-radius: 8px; padding: 8px; }
+      #deck .brainbox.value { border-color: #2f6f9f; }
+      #deck .brainbox.base { border-color: #6f5030; }
+      #deck .brainbox .bh { font-size: 11px; font-weight: 700; margin-bottom: 4px; line-height: 1.3; }
+      #deck .brainbox.value .bh { color: #7cc0ff; }
+      #deck .brainbox.base .bh { color: #f0c078; }
+      #deck .brainbox .top { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+      #deck .rk { font-size: 11px; margin: 2px 0; color: #c0c7d6; }
+      #deck .rk .rkbar { height: 5px; border-radius: 3px; background: #2a2f3d; overflow: hidden; margin-top: 1px; }
+      #deck .rk .rkbar > i { display: block; height: 100%; }
+      #deck .brainbox.value .rk .rkbar > i { background: #4f8cff; }
+      #deck .brainbox.base .rk .rkbar > i { background: #d99a3a; }
+      #deck .rk.win { font-weight: 700; color: #eef2fa; }
+      #deck .say { margin-top: 6px; font-size: 11px; color: #cbb98a; font-style: italic; }
+      #deck .costline { margin-top: 8px; font-size: 11px; color: #8b93a7; text-align: center; line-height: 1.5; }
+      #deck .costline b { color: #9dd0ff; }
+      /* 双脑协作面板：把"这一刻 1.5B 在决策、7B 在配音、两者信息互通"摊开给观众——Demo 核心输出点 */
+      #deck .dkbrains { margin-bottom: 8px; }
+      #deck .brainrow { border-radius: 8px; padding: 7px 10px; margin-bottom: 6px; background: #12151f; border: 1px solid #2a2f3d; }
+      #deck .brainrow.decide { border-color: #2f6f9f; }
+      #deck .brainrow.speak { border-color: #2f7f57; }
+      #deck .brainrow .btag { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-bottom: 4px; }
+      #deck .brainrow.decide .btag { color: #7cc0ff; background: rgba(79,140,255,.14); }
+      #deck .brainrow.speak .btag { color: #7ee0a0; background: rgba(80,200,130,.14); }
+      #deck .brainrow .bmain { font-size: 13px; color: #e6e8ee; line-height: 1.45; }
+      #deck .brainrow .bwhy { font-size: 11px; color: #9fb0c8; margin-top: 3px; line-height: 1.5; }
+      #deck .binterlink { font-size: 10.5px; color: #9aa4bb; padding: 5px 9px; border-radius: 6px;
+        background: rgba(70,58,96,.30); line-height: 1.55; }
+      #deck .bwatch { font-size: 11px; color: #ff9db0; margin-top: 5px; }
+
+      #pausebtn { position: fixed; top: 78px; left: 12px; z-index: 33; cursor: pointer; user-select: none;
+        background: rgba(18,20,28,.85); border: 1px solid #4a5474; border-radius: 8px; padding: 5px 10px;
+        font-size: 12px; color: #dfe6f5; }
+      #pausebtn:hover { border-color: #6ea8ff; }
+      #pausebtn.on { background: #3a2410; border-color: #e0952f; color: #ffd9a0; font-weight: 700; }
+      #pausedtag { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 34; display: none;
+        padding: 4px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; letter-spacing: 2px;
+        color: #ffd9a0; background: rgba(58,36,16,.9); border: 1px solid #b5762a; }
+      #finalebtn { position: fixed; top: 110px; left: 12px; z-index: 33; cursor: pointer; user-select: none;
+        background: linear-gradient(180deg,#7a1f16,#4a130d); border: 1px solid rgba(255,120,120,.6);
+        border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 700; color: #ffd7cf; }
+      #finalebtn:hover { border-color: #ff6b5a; }
+
+      /* 两脑对比记分板（持久 HUD）：微调 vs 裸本地大模型的累计延迟/成本 + 护栏合规率 */
+      #scoreboard {
+        position: fixed; top: 144px; left: 12px; z-index: 32; width: 250px;
+        background: rgba(18, 20, 28, 0.86); color: #e6e8ee; border: 1px solid #2a2f3d;
+        border-radius: 10px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5;
+        backdrop-filter: blur(6px);
+      }
+      #scoreboard .sbh { font-size: 12px; font-weight: 700; color: #9dd0ff; margin-bottom: 4px; }
+      #scoreboard .sbrow { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; }
+      #scoreboard .sbrow .k { color: #8b93a7; }
+      #scoreboard .sbrow .v { font-variant-numeric: tabular-nums; }
+      #scoreboard .v.good { color: #7ee787; }
+      #scoreboard .v.bad { color: #ff9c93; }
+      #scoreboard .v.blue { color: #7cc0ff; }
+      #scoreboard .sbnote { color: #7a8296; font-size: 10px; margin-top: 5px; border-top: 1px solid #262c3a; padding-top: 5px; }
+
+      /* —— 公开夜班：收掉研究用面板 —— */
+      body.public-mode #panel,
+      body.public-mode #telemetry,
+      body.public-mode #scoreboard,
+      body.public-mode #finalebtn,
+      body.public-mode #jbtn,
+      body.public-mode #journal,
+      body.public-mode #inspect,
+      body.public-mode #body { display: none !important; }
+      body.public-mode #pausebtn { top: 12px; left: auto; right: 12px; }
+      body.public-mode #status { display: none; }
+      body.public-mode #newgamebtn { top: auto; bottom: 14px; left: 12px; }
+
+      #shifthud {
+        display: none; position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+        z-index: 42; min-width: 420px; max-width: 640px;
+        background: rgba(16, 18, 26, .88); border: 1px solid rgba(255, 210, 120, .35);
+        border-radius: 12px; padding: 8px 14px 10px; color: #e8e2ea;
+        backdrop-filter: blur(8px); pointer-events: auto;
+      }
+      #shifthud .sh-title { font: 800 13px system-ui; color: #ffe08a; letter-spacing: 2px; }
+      #shifthud .sh-row { display: flex; gap: 14px; margin-top: 6px; font: 600 12px/1.4 system-ui; flex-wrap: wrap; }
+      #shifthud .sh-row b { font-variant-numeric: tabular-nums; }
+      #shifthud .ok { color: #8fe0a8; } #shifthud .warn { color: #ffb04d; } #shifthud .bad { color: #ff9c93; }
+      #shifthud .riot-0 { color: #8fe0a8; }
+      #shifthud .riot-1 { color: #c9e08a; }
+      #shifthud .riot-2 { color: #ffb04d; }
+      #shifthud .riot-3 { color: #ff8a4d; }
+      #shifthud .riot-4 { color: #ff6b6b; font-weight: 800; }
+      .incard.hot { border-color: rgba(255, 70, 70, .8); background: rgba(58, 14, 18, .96); }
+      #shifthud .sh-powers { margin-top: 7px; display: flex; gap: 6px; flex-wrap: wrap; }
+      #shifthud .pbtn {
+        padding: 3px 9px; border-radius: 7px; cursor: pointer; font: 700 11px system-ui;
+        background: rgba(28,32,44,.92); color: #dfe6f2; border: 1px solid rgba(255,255,255,.18);
+      }
+      #incidentstack {
+        display: none; position: fixed; top: 92px; right: 14px;
+        z-index: 43; width: min(340px, 30vw); flex-direction: column; gap: 8px;
+        max-height: calc(100vh - 120px); overflow-y: auto;
+        scrollbar-width: thin;
+      }
+      #incidentstack.show { display: flex; }
+      .incard {
+        background: rgba(42, 18, 22, .94); border: 1px solid rgba(255, 120, 90, .55);
+        border-radius: 12px; padding: 12px 14px; color: #ffe8e0;
+        box-shadow: 0 10px 32px rgba(80, 10, 10, .45);
+      }
+      /* 折叠态：只留标题条，其余内容收起，多起事件时不铺满屏幕 */
+      .incard.collapsed { padding: 8px 12px; opacity: .82; }
+      .incard.collapsed .idist,
+      .incard.collapsed .isigns,
+      .incard.collapsed .ifog,
+      .incard.collapsed .irow { display: none; }
+      .incard .icaret { display: inline-block; width: 14px; color: #ffb890; font-weight: 700; }
+      .incard .ih { font: 800 14px system-ui; color: #ffd08a; }
+      #incidentstack .incard .ih { cursor: pointer; }
+      .incard .isigns { font: 500 13px/1.55 system-ui; color: #f0d4cc; margin: 6px 0 4px; }
+      .incard .ifog { font: 500 12px/1.45 system-ui; color: #9aa8c0; margin: 0 0 10px; }
+      .incard .irow { display: flex; flex-wrap: wrap; gap: 6px; }
+      .incard .ibtn {
+        padding: 5px 10px; border-radius: 8px; cursor: pointer; font: 700 12px system-ui;
+        background: rgba(28,32,44,.95); color: #efe6dc; border: 1px solid rgba(255,210,140,.35);
+      }
+      .incard .ibtn:disabled { opacity: .45; cursor: default; }
+      .incard .idist { font: 600 11px system-ui; color: #ffb04d; margin-bottom: 6px; }
+      #gotobar {
+        display: none; position: fixed; bottom: 86px; left: 50%; transform: translateX(-50%);
+        z-index: 41; padding: 8px 16px; border-radius: 10px; font: 700 13px system-ui;
+        color: #ffe08a; background: rgba(18, 20, 28, .9); border: 1px solid rgba(255,210,90,.4);
+      }
+      #shiftend {
+        display: none; position: fixed; inset: 0; z-index: 90; align-items: center; justify-content: center;
+        background: rgba(4, 5, 10, .82);
+      }
+      #shifthud .sh-log { margin-top: 6px; font: 500 11px/1.4 system-ui; color: #9aa4bb; max-width: 620px; }
+      #shiftend .card {
+        width: min(560px, 92vw); max-height: 90vh; overflow: auto; padding: 28px 32px; border-radius: 14px; color: #e8e2ea;
+        background: radial-gradient(circle at 50% 0%, #2a2230, #121018);
+        border: 1px solid rgba(255, 210, 120, .4);
+      }
+      #shiftprose { margin-top: 14px; font: 500 14px/1.75 system-ui; color: #d4c8b8; white-space: pre-wrap; }
+      #qqs { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px;
+        border-top: 1px solid rgba(255,255,255,.08); }
+      #qqs button {
+        padding: 4px 9px; border-radius: 8px; cursor: pointer; font: 700 11px system-ui;
+        background: rgba(28,32,44,.92); color: #ffe6a6; border: 1px solid rgba(255,210,120,.4);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="loader"><div class="spin"></div><div>正在加载监狱与犯人…</div></div>
+    <div id="banner"></div>
+    <div id="toast"></div>
+    <div id="talkhint"></div>
+    <div id="acthint"></div>
+    <div id="bag"></div>
+    <div id="body"></div>
+    <div id="hurtflash"></div>
+    <div id="status">连接中…</div>
+    <div id="shifthud"></div>
+    <div id="incidentstack"></div>
+    <div id="gotobar"></div>
+    <div id="shiftend"></div>
+    <div id="pausebtn">⏸ 暂停世界 (空格)</div>
+    <div id="finalebtn">⚡ 发起终局 · 结算</div>
+    <div id="pausedtag">⏸ 已暂停</div>
+    <div id="scoreboard"></div>
+    <div id="deck"></div>
+    <div id="cambar"></div>
+    <div id="playhint"><b>1</b> 俯瞰 · <b>4/5</b> 走查 · <b>点击犯人</b> 档案 · <b>E</b> 审讯 · <b>空格</b> 暂停 · 守到天亮</div>
+    <div id="chat">
+      <div class="chead"><span id="chattitle">对话</span><span class="cclose" id="chatclose">✕ 关闭 (Esc)</span></div>
+      <div id="chatlog"></div>
+      <div id="chatbar">
+        <input id="chatin" placeholder="说点什么…（回车发送）" autocomplete="off" />
+        <button id="chatsend">发送</button>
+      </div>
+    </div>
+    <div id="jbtn">📋 案件板 (J) <span id="jcount"></span></div>
+    <div id="journal">
+      <span class="jclose" id="jclose">✕ (J/Esc)</span>
+      <h2 id="jtitle">案件板</h2>
+      <div class="intro" id="jintro"></div>
+      <div class="prog" id="jprog"></div>
+      <div id="jclues"></div>
+      <div class="concl" id="jconcl" style="display:none"></div>
+    </div>
+    <div id="inspect">
+      <div class="card">
+        <div class="ico" id="insico">🔍</div>
+        <div class="nm" id="insnm"></div>
+        <div class="desc" id="insdesc"></div>
+        <div class="ins" id="insins"></div>
+        <button class="ok" id="insok">收入证物袋</button>
+      </div>
+    </div>
+    <div id="panel">
+      <h2 id="ptitle">切视角 · 决策面板</h2>
+      <div id="npclist"></div>
+      <div id="explain">点一个犯人看它在纠结啥…</div>
+      <div class="needs" id="needs"></div>
+      <div class="sit" id="sit"></div>
+      <div id="cands"></div>
+      <div id="controls">
+        <div class="clabel" id="cmdlabel">下指令（先选一个犯人）</div>
+        <div class="btns" id="cmdbtns"></div>
+        <div class="clabel">挑事 · 制造事件</div>
+        <div class="btns" id="evtbtns"></div>
+        <div class="clabel">招牌片段 · 一键演示</div>
+        <div class="btns" id="scenbtns"></div>
+        <div class="clabel">导出给 mentor</div>
+        <div class="btns" id="expbtns"></div>
+      </div>
+      <details><summary>原始 context（喂给模型的原文）</summary><div class="sub" id="ctx"></div></details>
+    </div>
+    <div id="telemetry">
+      <div class="thead">放风场人数 · 自组织 (El Farol)</div>
+      <div class="tsub">虚线=舒适阈值；人多→怕挤的躲开→人少→又回来，围着阈值来回摆</div>
+      <canvas id="elfarol" width="300" height="96"></canvas>
+      <div class="thead" style="margin-top:8px;">各性格的选择分布（性格差异）</div>
+      <div id="dist"></div>
+      <div class="dlegend" id="dlegend"></div>
+    </div>
+    <div id="newgamebtn" title="重新接班：清空本夜处置与评分">↺ 重新接班</div>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.js?v=129"></script>
+  </body>
+</html>
